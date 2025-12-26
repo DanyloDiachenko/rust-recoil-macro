@@ -1,5 +1,5 @@
 -- ~/.hammerspoon/utils.lua
-local config = require("config.lua")
+local config = require("config")
 
 local utils = {}
 

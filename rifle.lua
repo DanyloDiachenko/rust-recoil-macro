@@ -1,7 +1,7 @@
 -- ~/.hammerspoon/rifle.lua
-local patterns = require("patterns.lua")
-local utils = require("utils.lua")
-local config = require("config.lua")
+local patterns = require("patterns")
+local utils = require("utils")
+local config = require("config")
 
 local rifle = {}
 
@@ -46,14 +46,6 @@ function rifle:rawInputMouseMove(dx, dy)
         self:log(string.format("[RAW] Step %d: dx=%.2f, dy=%.2f", 
             self.STATE.stepIndex, dx, dy))
     end
-end
-
-function rifle:standardMouseMove(dx, dy)
-    if not self.STATE.originalMousePosition then
-        return
-    end
-    
-    self:rawInputMouseMove(dx, dy)
 end
 
 function rifle:calculatePattern()
@@ -184,7 +176,7 @@ function rifle:setupMouseDetection()
 end
 
 function rifle:startShooting()
-    if not self.STATE.enabled or self.STATE.shooting or not isRustActive() then 
+    if not self.STATE.enabled or self.STATE.shooting or not utils:isRustActive() then 
         return 
     end
     
@@ -196,7 +188,7 @@ function rifle:startShooting()
         self.STATE.patternLength))
     
     self.compensationTimer = hs.timer.new(0.04, function()
-        if not self.STATE.shooting or not isRustActive() then
+        if not self.STATE.shooting or not utils:isRustActive() then
             if self.compensationTimer then
                 self.compensationTimer:stop()
             end
@@ -210,7 +202,7 @@ function rifle:startShooting()
 end
 
 function rifle:compensationStep()
-    if not self.STATE.shooting or not isRustActive() then
+    if not self.STATE.shooting or not utils:isRustActive() then
         return
     end
     
@@ -225,7 +217,7 @@ function rifle:compensationStep()
         self:log("[COMP] Rust closed, compensation not executed")
         return
     else
-        self:standardMouseMove(step.dx, step.dy)
+        self:rawInputMouseMove(step.dx, step.dy)
     end
     
     self.STATE.stepIndex = self.STATE.stepIndex + 1
