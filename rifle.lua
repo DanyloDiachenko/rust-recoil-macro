@@ -2,6 +2,7 @@
 local patterns = require("patterns")
 local utils = require("utils")
 local config = require("config")
+local randomizer = require("randomizer")
 
 local rifle = {}
 
@@ -18,34 +19,46 @@ rifle.STATE = {
 
 function rifle:rawInputMouseMove(dx, dy)
     if not self.STATE.originalMousePosition then return end
-    
-    local currentPosition = hs.mouse.absolutePosition()
-    
-    local event = hs.eventtap.event.newMouseEvent(
-        hs.eventtap.event.types.mouseMoved,
-        {x = currentPosition.x + dx, y = currentPosition.y + dy}
-    )
-    
-    event:setFlags({})
-    event:setProperty(hs.eventtap.event.properties.mouseEventDeltaX, math.floor(dx * 10))
-    event:setProperty(hs.eventtap.event.properties.mouseEventDeltaY, math.floor(dy * 10))
-    event:setProperty(hs.eventtap.event.properties.mouseEventSubtype, 0)
-    
-    event:post()
-    hs.timer.usleep(1000)
-    
-    hs.mouse.absolutePosition({
-        x = currentPosition.x + (dx * 0.01),
-        y = currentPosition.y + (dy * 0.01)
-    })
-    
-    hs.timer.usleep(2000)
-    hs.mouse.absolutePosition(self.STATE.originalMousePosition)
-    
-    if config.debug and utils:isRustActive() then
-        self:log(string.format("[RAW] Step %d: dx=%.2f, dy=%.2f", 
-            self.STATE.stepIndex, dx, dy))
+
+    local baseTargetX = dx
+    local baseTargetY = dy
+
+    for i = 1, config.randomizer do'
+        local random1 = math.random(config.randomizer.minMultiplierRandomizer, config.randomizer.maxMultiplierRandomizer)
+        local random2 = math.random(config.randomizer.minMultiplierRandomizer, config.randomizer.maxMultiplierRandomizer)
+
+        local multiplier = ((math.random(random1 + random2) / 2) / 100)
+
+        local noiseX = math.random(config.randomizer.minXNoise, config.randomizer.maxXNoise)
+
+        local stepDx = (baseTargetX / smoothness) * multiplier + noiseX
+        local stepDy = (baseTargetY / smoothness) * multiplier
+
+        local currentPosition = hs.mouse.absolutePosition()
+        
+        local event = hs.eventtap.event.newMouseEvent(
+            hs.eventtap.event.types.mouseMoved,
+            {x = currentPosition.x + stepDx, y = currentPosition.y + stepDy}
+        )
+
+        event:setFlags({})
+        event:setProperty(hs.eventtap.event.properties.mouseEventDeltaX, math.floor(stepDx * 10))
+        event:setProperty(hs.eventtap.event.properties.mouseEventDeltaY, math.floor(stepDy * 10))
+        event:setProperty(hs.eventtap.event.properties.mouseEventSubtype, 0)
+        event:post()
+
+        hs.timer.usleep(math.random(config.randomizer.minMicroStepPause, config.randomizer.maxMicroStepPause))
     end
+
+    local finalJitterX = math.random(config.randomizer.minFinalJytter, config.randomizer.maxFinalJytter)
+    local finalJitterY = math.random(config.randomizer.minFinalJytter, config.randomizer.maxFinalJytter)
+
+    hs.mouse.absolutePosition({
+        x = self.STATE.originalMousePosition.x + finalJitterX,
+        y = self.STATE.originalMousePosition.y + finalJitterY
+    })
+
+    hs.timer.usleep(math.random(config.randomizer.minPauseWhileShooting, config.randomizer.maxPauseWhileShooting))
 end
 
 function rifle:calculatePattern()
@@ -55,7 +68,7 @@ function rifle:calculatePattern()
     
     local multiplier = sensitivityMultiplier * dpiMultiplier * resolutionMultiplier
     
-    self:log(string.format("[CALC] Multipliers: sensivity=%.3f, DPI=%.3f, resolution=%.3f, total=%.3f",
+    utils:log(string.format("[CALC] Multipliers: sensitivity=%.3f, DPI=%.3f, resolution=%.3f, total=%.3f",
         sensitivityMultiplier, dpiMultiplier, resolutionMultiplier, multiplier))
     
     local scaledPattern = {}
@@ -69,7 +82,7 @@ function rifle:calculatePattern()
         table.insert(scaledPattern, scaledStep)
         
         if config.debug and i <= 5 then
-            self:log(string.format("[PATTERN] Step %d: dx=%.3f->%.3f, dy=%.3f->%.3f", 
+            utils:log(string.format("[PATTERN] Step %d: dx=%.3f->%.3f, dy=%.3f->%.3f", 
                 i, step.dx, scaledStep.dx, step.dy, scaledStep.dy))
         end
     end
@@ -104,7 +117,7 @@ function rifle:detectGameMode()
         if mainWindow then
             self.STATE.isInGameMode = mainWindow:isFullScreen()
             if config.debug then
-                self:log(string.format("[MODE] Fullscreen mode: %s", 
+                utils:log(string.format("[MODE] Fullscreen mode: %s", 
                     tostring(self.STATE.isInGameMode)))
             end
         end
@@ -139,13 +152,13 @@ function rifle:setupMouseDetection()
           hs.eventtap.event.types.leftMouseUp },
         function(event)
             if not self.STATE.enabled then return false end
-            if not isRustActive() then return false end
+            if not utils:isRustActive() then return false end
             
             local eventType = event:getType()
             
             if eventType == hs.eventtap.event.types.leftMouseDown then
                 if not self.STATE.shooting then
-                    self:log("Left Click in Rust - start")
+                    utils:log("Left Click in Rust - start")
                     
                     self.STATE.originalMousePosition = hs.mouse.absolutePosition()
                     
@@ -153,7 +166,7 @@ function rifle:setupMouseDetection()
                     
                     self:detectGameMode()
                     
-                    self:log(string.format("[START] Position: %.0f, %.0f | Mode: %s",
+                    utils:log(string.format("[START] Position: %.0f, %.0f | Mode: %s",
                         self.STATE.originalMousePosition.x, self.STATE.originalMousePosition.y,
                         self.STATE.isInGameMode and "Game" or "Menu"))
                     
@@ -162,7 +175,7 @@ function rifle:setupMouseDetection()
                 
             elseif eventType == hs.eventtap.event.types.leftMouseUp then
                 if self.STATE.shooting then
-                    self:log("Left mouse button released - stop")
+                    utils:log("Left mouse button released - stop")
                     self:stopShooting()
                 end
             end
@@ -172,7 +185,7 @@ function rifle:setupMouseDetection()
     )
     
     self.mouseEventWatcher:start()
-    self:log("Mouse detection enabled")
+    utils:log("Mouse detection enabled")
 end
 
 function rifle:startShooting()
@@ -183,8 +196,8 @@ function rifle:startShooting()
     self.STATE.shooting = true
     self.STATE.stepIndex = 1
     
-    self:log("=== SHOOTING STARTED ===")
-    self:log(string.format("Pattern length: %d steps, method: alternating", 
+    utils:log("=== SHOOTING STARTED ===")
+    utils:log(string.format("Pattern length: %d steps, method: raw input only (randomized)", 
         self.STATE.patternLength))
     
     self.compensationTimer = hs.timer.new(0.04, function()
@@ -214,7 +227,7 @@ function rifle:compensationStep()
     end
     
     if not self.STATE.isInGameMode then
-        self:log("[COMP] Rust closed, compensation not executed")
+        utils:log("[COMP] Rust closed, compensation not executed")
         return
     else
         self:rawInputMouseMove(step.dx, step.dy)
@@ -224,7 +237,7 @@ function rifle:compensationStep()
     
     if self.STATE.stepIndex > self.STATE.patternLength then
         self.STATE.stepIndex = 1
-        self:log("[COMP] Pattern completed, starting over")
+        utils:log("[COMP] Pattern completed, starting over")
     end
 end
 
@@ -240,13 +253,13 @@ function rifle:stopShooting()
         self.compensationTimer = nil
     end
     
-    self:log("=== SHOOTING STOPPED ===")
-    self:log(string.format("Steps completed: %d", 
+    utils:log("=== SHOOTING STOPPED ===")
+    utils:log(string.format("Steps completed: %d", 
         self.STATE.stepIndex - 1))
     
     if self.STATE.originalMousePosition then
         hs.mouse.absolutePosition(self.STATE.originalMousePosition)
-        self:log("[STOP] Cursor returned")
+        utils:log("[STOP] Cursor returned")
     end
     
     self:resetState()
