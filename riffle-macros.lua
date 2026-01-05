@@ -6,7 +6,7 @@ rifle.CONFIG = {
     
     sensitivity = 0.6,          
     fov = 90, 
-    dpi = 800,      
+    dpi = 800, --[[ or 1500 ]]
     screenResolutionHeight = 1600,           
     
     basePattern = {
